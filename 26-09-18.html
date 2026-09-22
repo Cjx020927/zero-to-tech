@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>打地鼠游戏</title>
+    <link rel="stylesheet" href="26-09-18.css">
+</head>
+<body>
+    <h1 class="title">打地鼠游戏</h1>
+    <div class="info">
+        <span>分数：<span id="score">0</span></span>
+        <span>剩余时间：<span id="time">30</span>秒</span>
+        <span>连击：<span id="combo">0</span></span>
+        <span>最高分：<span id="best">0</span></span>
+    </div>
+
+    <div class="controls">
+        <label>难度：
+            <select id="difficulty">
+                <option value="easy">简单</option>
+                <option value="normal" selected>普通</option>
+                <option value="hard">困难</option>
+            </select>
+        </label>
+        <button id="startBtn">开始游戏</button>
+        <button id="pauseBtn" disabled>暂停</button>
+        <label class="sound-label">
+            <input type="checkbox" id="soundToggle" checked> 音效
+        </label>
+    </div>
+
+    <div class="container" id="gameBox">
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+        <div class="hole"><div class="mole"></div></div>
+    </div>
+
+    <!-- 游戏结束弹窗 -->
+    <div class="modal" id="overModal">
+        <div class="modal-content">
+            <h2>游戏结束</h2>
+            <p>本轮分数：<span id="finalScore">0</span></p>
+            <p id="bestTip">最高分：<span id="modalBest">0</span></p>
+            <button id="restartBtn">再来一局</button>
+        </div>
+    </div>
+
+    <script>
+        const holes = document.querySelectorAll('.hole');
+        const scoreEl = document.getElementById('score');
+        const timeEl = document.getElementById('time');
+        const comboEl = document.getElementById('combo');
+        const bestEl = document.getElementById('best');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const difficultyEl = document.getElementById('difficulty');
+        const soundToggle = document.getElementById('soundToggle');
+        const overModal = document.getElementById('overModal');
+        const finalScore = document.getElementById('finalScore');
+        const modalBest = document.getElementById('modalBest');
+        const bestTip = document.getElementById('bestTip');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // 难度配置：地鼠停留时间(ms)、出现间隔(ms)、同时最多数量
+        const DIFF = {
+            easy:   { stay: 900, gap: 900,  max: 2 },
+            normal: { stay: 700, gap: 650,  max: 2 },
+            hard:   { stay: 500, gap: 400,  max: 3 }
+        };
+
+        let score = 0;
+        let combo = 0;
+        let timeLeft = 30;
+        let isPlaying = false;
+        let isPaused = false;
+        let timer;
+        let spawnTimer;
+        let activeHoles = new Set();
+        let bestScore = Number(localStorage.getItem('whackBest') || 0);
+        bestEl.textContent = bestScore;
+
+        // 简易音效（Web Audio API）
+        let audioCtx = null;
+        function beep(freq, duration, type='sine', vol=0.15) {
+            if (!soundToggle.checked) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.type = type;
+                o.frequency.value = freq;
+                g.gain.value = vol;
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start();
+                o.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+        const sfxHit  = () => beep(880, 0.08, 'square', 0.18);
+        const sfxMiss = () => beep(180, 0.10, 'sawtooth', 0.12);
+        const sfxOver = () => { beep(440, 0.12, 'triangle', 0.18); setTimeout(()=>beep(330,0.18,'triangle',0.18),130); };
+
+        // 随机选中地洞冒出地鼠
+        function popMole() {
+            if (!isPlaying || isPaused) return;
+            const cfg = DIFF[difficultyEl.value];
+            // 已露出数量已达上限则等待下一次
+            if (activeHoles.size >= cfg.max) return;
+            // 找一个没露出的洞
+            const free = [...holes].filter(h => !h.classList.contains('up'));
+            if (free.length === 0) return;
+            const hole = free[Math.floor(Math.random() * free.length)];
+            hole.classList.add('up');
+            hole.classList.remove('hit');
+            activeHoles.add(hole);
+            setTimeout(() => {
+                if (hole.classList.contains('up')) {
+                    // 超时未打中，连击清零
+                    hole.classList.remove('up');
+                    activeHoles.delete(hole);
+                    combo = 0;
+                    comboEl.textContent = combo;
+                }
+            }, cfg.stay);
+        }
+
+        function spawnLoop() {
+            if (!isPlaying || isPaused) return;
+            popMole();
+            // 困难难度偶尔同时弹出第二只
+            const cfg = DIFF[difficultyEl.value];
+            if (Math.random() < 0.3 && cfg.max > 1) popMole();
+            spawnTimer = setTimeout(spawnLoop, cfg.gap);
+        }
+
+        // 打地鼠
+        function hit(e) {
+            if (!isPlaying || isPaused) return;
+            // 只在点到地鼠时计分
+            const moleEl = e.target.closest('.mole');
+            if (!moleEl || !e.currentTarget.classList.contains('up')) {
+                // 未命中地鼠（点到空洞）
+                combo = 0;
+                comboEl.textContent = combo;
+                sfxMiss();
+                return;
+            }
+            combo += 1;
+            // 连击加成
+            const gain = 1 + Math.floor(combo / 5);
+            score += gain;
+            scoreEl.textContent = score;
+            comboEl.textContent = combo;
+            const hole = e.currentTarget;
+            hole.classList.add('hit');
+            hole.classList.remove('up');
+            activeHoles.delete(hole);
+            sfxHit();
+        }
+
+        holes.forEach(hole => hole.addEventListener('click', hit));
+
+        // 倒计时
+        function countDown() {
+            if (isPaused) return;
+            timeLeft--;
+            timeEl.textContent = timeLeft;
+            if (timeLeft <= 0) endGame();
+        }
+
+        function endGame() {
+            isPlaying = false;
+            clearInterval(timer);
+            clearTimeout(spawnTimer);
+            holes.forEach(h => { h.classList.remove('up','hit'); });
+            activeHoles.clear();
+            sfxOver();
+            // 更新最高分
+            let isNewBest = false;
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('whackBest', bestScore);
+                bestEl.textContent = bestScore;
+                isNewBest = true;
+            }
+            finalScore.textContent = score;
+            modalBest.textContent = bestScore;
+            bestTip.textContent = isNewBest ? `🎉 新纪录！最高分：${bestScore}` : `最高分：${bestScore}`;
+            overModal.classList.add('show');
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+        }
+
+        function startGame() {
+            score = 0;
+            combo = 0;
+            timeLeft = 30;
+            scoreEl.textContent = score;
+            comboEl.textContent = combo;
+            timeEl.textContent = timeLeft;
+            isPlaying = true;
+            isPaused = false;
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            pauseBtn.textContent = '暂停';
+            overModal.classList.remove('show');
+            timer = setInterval(countDown, 1000);
+            spawnLoop();
+        }
+
+        function togglePause() {
+            if (!isPlaying) return;
+            isPaused = !isPaused;
+            pauseBtn.textContent = isPaused ? '继续' : '暂停';
+        }
+
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', togglePause);
+        restartBtn.addEventListener('click', startGame);
+
+        // 空格键暂停/继续
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+        });
+    </script>
+</body>
+</html>

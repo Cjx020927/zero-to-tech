@@ -1,0 +1,164 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #94d86b;
+    padding: 20px 20px 40px;
+    font-family: "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(180deg, #a8e07a 0%, #94d86b 60%, #6fa84a 100%);
+}
+.title {
+    color: #5a3a1a;
+    margin-bottom: 14px;
+    text-shadow: 1px 1px 0 #fff;
+    font-size: 28px;
+}
+.info {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 20px;
+    color: #3a2400;
+    background: rgba(255,255,255,0.55);
+    padding: 10px 18px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-weight: bold;
+}
+.info span span {
+    color: #c0392b;
+    min-width: 24px;
+    display: inline-block;
+    text-align: right;
+}
+.controls {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.controls label {
+    font-size: 16px;
+    color: #3a2400;
+    font-weight: bold;
+}
+.controls select,
+.controls button {
+    font-size: 16px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #5a3a1a;
+    color: #fff;
+    transition: transform 0.1s, background 0.2s;
+}
+.controls select { background: #fff; color: #3a2400; }
+.controls button:hover:not(:disabled) { background: #7a4a22; transform: translateY(-1px); }
+.controls button:disabled { background: #999; cursor: not-allowed; }
+.sound-label { font-weight: normal; display: inline-flex; align-items: center; gap: 4px; }
+.sound-label input { width: 16px; height: 16px; }
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    gap: 16px;
+    background: #6b4423;
+    padding: 16px;
+    border-radius: 16px;
+    box-shadow: 0 6px 0 #4a2f17, 0 10px 20px rgba(0,0,0,0.25);
+}
+.hole {
+    width: 120px;
+    height: 120px;
+    background: radial-gradient(ellipse at center, #2c1a0a 0%, #4a2f17 70%);
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: inset 0 6px 12px rgba(0,0,0,0.6);
+}
+.mole {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    position: absolute;
+    bottom: -80px;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: bottom 0.18s ease;
+    background-image: url("mouse.png");
+    background-size: cover;
+    background-position: center;
+    /* 灰色 fallback 占位，mouse.png 加载失败时仍可见 */
+    background-color: #b08454;
+}
+.hole.up .mole {
+    bottom: 10px;
+}
+/* 击中后短暂下压动画 */
+.hole.hit .mole {
+    bottom: -80px;
+    transition: bottom 0.12s ease;
+}
+.hole.hit::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 60px; height: 60px;
+    border: 4px solid #ffd700;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    animation: pop 0.3s ease-out;
+    pointer-events: none;
+}
+@keyframes pop {
+    0%   { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+}
+
+/* 游戏结束弹窗 */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 99;
+}
+.modal.show { display: flex; }
+.modal-content {
+    background: #fff;
+    padding: 28px 36px;
+    border-radius: 16px;
+    text-align: center;
+    animation: drop 0.3s ease-out;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.modal-content h2 { color: #5a3a1a; margin-bottom: 14px; }
+.modal-content p { font-size: 18px; margin: 6px 0; color: #3a2400; }
+.modal-content button {
+    margin-top: 16px;
+    padding: 8px 24px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    background: #5a3a1a;
+    color: #fff;
+    cursor: pointer;
+}
+.modal-content button:hover { background: #7a4a22; }
+@keyframes drop {
+    from { transform: translateY(-30px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+}
